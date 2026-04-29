@@ -640,40 +640,43 @@ function todayISODate() {
 }
 
 function loadWeather() {
-  var url = WORKER_URL + '/weather-lite?t=' + Math.floor(Date.now() / 60000);
+  var url = WORKER_URL + '/weather?t=' + Math.floor(Date.now() / 60000);
 
-  ajax(url, function(err, data) {
-    if (err || !data || !data.current) {
-      $('wDesc').innerHTML = '<span class="err">Erreur météo</span>';
-      return;
-    }
+  ajax(url, function(err, payload) {
+    if (err || !payload || !payload.meteo) { $('wDesc').innerHTML = '<span class="err">Erreur météo</span>'; return; }
 
-    if (data.times) setTimes(data.times);
+    var data = payload.meteo;
+    if (payload.times) setTimes(payload.times);
+    window.__aqiForecastData = payload.aqiForecast;
 
     var c = data.current;
     var w = weatherDesc(c.weather_code, c.is_day === 1);
 
-    $('temp').innerHTML = c.temp;
-    $('feels').innerHTML = c.feels;
+    $('temp').innerHTML = Math.round(c.temperature_2m);
+    $('feels').innerHTML = Math.round(c.apparent_temperature);
     $('wIcon').innerHTML = w.icon;
     $('wDesc').innerHTML = w.desc;
-    $('humidity').innerHTML = c.humidity;
-    $('wind').innerHTML = c.wind;
-    $('pressure').innerHTML = c.pressure + ' hPa';
-    $('rainProb').innerHTML = c.rain_prob;
+    $('humidity').innerHTML = Math.round(c.relative_humidity_2m);
+    $('wind').innerHTML = Math.round(c.wind_speed_10m);
+    $('pressure').innerHTML = Math.round(c.surface_pressure) + ' hPa';
+    $('rainProb').innerHTML = c.precipitation_probability != null ? Math.round(c.precipitation_probability) : '0';
 
-    if (data.sun) {
-      $('sunrise').innerHTML = data.sun.sunrise;
-      $('sunset').innerHTML = data.sun.sunset;
+    if (data.daily && data.daily.sunrise && data.daily.sunrise[0]) {
+      $('sunrise').innerHTML = data.daily.sunrise[0].substr(11, 5);
+      $('sunset').innerHTML = data.daily.sunset[0].substr(11, 5);
     }
 
-    var nowH = data.times ? parseInt(data.times.hanoi_hh, 10) : new Date().getHours();
-    $('uvNow').innerHTML = Math.round(c.uv);
+    var nowH = serverTimes ? parseInt(serverTimes.hanoi_hh, 10) : new Date().getHours();
+    var today = serverTimes ? serverTimes.hanoi_iso_date : todayISODate();
+    $('uvNow').innerHTML = Math.round(c.uv_index);
 
-    /* UV horaire (12 prochaines heures) */
+    var startIdx = findHourIndex(data.hourly.time, nowH, today);
+    var uvs = data.hourly.uv_index;
     var uvHtml = '';
-    for (var j = 0; j < 12 && j < data.hourly.uv.length; j++) {
-      var uv = data.hourly.uv[j];
+    for (var j = 0; j < 12; j++) {
+      var idx = startIdx + j;
+      if (idx >= uvs.length) break;
+      var uv = uvs[idx];
       var meta = uvCategory(uv);
       var hourLabel = (nowH + j) % 24;
       uvHtml += '<div class="uv-cell" style="background:' + meta.bg + '; color:' + meta.color + ';">'
@@ -682,60 +685,79 @@ function loadWeather() {
     }
     $('uvGrid').innerHTML = uvHtml;
 
-    /* 5 jours */
-    var jours = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
-    var dHtml = '';
-    for (var k = 0; k < data.daily5.length; k++) {
-      var dd = data.daily5[k];
-      var dt = new Date(dd.date + 'T12:00:00');
-      var dInfo = weatherDesc(dd.code, true);
-      dHtml += '<div class="day">'
-             + '<div class="d-name">' + jours[dt.getDay()] + '</div>'
-             + '<div class="d-icon">' + dInfo.icon + '</div>'
-             + '<div class="d-max">' + dd.max + '°</div>'
-             + '<div class="d-min">' + dd.min + '°</div>'
-             + '<div class="d-rain">💧 ' + dd.rain + '%</div>'
-             + '</div>';
+    if (data.daily) {
+      var days = data.daily;
+      var jours = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+      var dHtml = '';
+      for (var k = 1; k <= 5; k++) {
+        if (!days.time[k]) break;
+        var dt = new Date(days.time[k] + 'T12:00:00');
+        var dInfo = weatherDesc(days.weather_code[k], true);
+        dHtml += '<div class="day">'
+               + '<div class="d-name">' + jours[dt.getDay()] + '</div>'
+               + '<div class="d-icon">' + dInfo.icon + '</div>'
+               + '<div class="d-max">' + Math.round(days.temperature_2m_max[k]) + '°</div>'
+               + '<div class="d-min">' + Math.round(days.temperature_2m_min[k]) + '°</div>'
+               + '<div class="d-rain">💧 ' + Math.round(days.precipitation_probability_max[k] || 0) + '%</div>'
+               + '</div>';
+      }
+      $('days5').innerHTML = dHtml;
     }
-    $('days5').innerHTML = dHtml;
 
-    /* Frise horaire 12h */
+    /* Frise horaire */
+    var hTemps = data.hourly.temperature_2m;
+    var hCodes = data.hourly.weather_code;
+    var hRain = data.hourly.precipitation_probability;
+    var hIsDay = data.hourly.is_day;
     var hHtml = '';
-    for (var m = 0; m < 12 && m < data.hourly.temp.length; m++) {
+    for (var m = 0; m < 12; m++) {
+      var hi = startIdx + m;
+      if (hi >= hTemps.length) break;
       var hLabel = (nowH + m) % 24;
-      var hInfo = weatherDesc(data.hourly.code[m], data.hourly.is_day[m] === 1);
-      var rainTxt = data.hourly.rain[m] >= 10 ? '💧' + data.hourly.rain[m] + '%' : '';
+      var hInfo = weatherDesc(hCodes[hi], hIsDay[hi] === 1);
+      var rainTxt = hRain[hi] && hRain[hi] >= 10 ? '💧' + Math.round(hRain[hi]) + '%' : '';
       hHtml += '<div class="hour-cell">'
              + '<div class="h-time">' + (m === 0 ? 'Maint.' : pad(hLabel) + 'h') + '</div>'
              + '<div class="h-icon">' + hInfo.icon + '</div>'
-             + '<div class="h-temp">' + data.hourly.temp[m] + '°</div>'
+             + '<div class="h-temp">' + Math.round(hTemps[hi]) + '°</div>'
              + '<div class="h-rain">' + rainTxt + '</div>'
              + '</div>';
     }
     $('hourlyGrid').innerHTML = hHtml;
 
-    /* Prévision AQI 24h */
-    var maxAqi = 0;
-    for (var p = 0; p < data.aqi24.length; p++) {
-      if (data.aqi24[p] > maxAqi) maxAqi = data.aqi24[p];
-    }
-    var scaleMax = Math.max(150, maxAqi);
-    var aqiHtml = '';
-    for (var q = 0; q < data.aqi24.length; q += 2) {
-      var aqi = data.aqi24[q];
-      var hPx = Math.max(2, (aqi / scaleMax) * 40);
-      var col = aqiToColor(aqi);
-      var hLab = (nowH + q) % 24;
-      aqiHtml += '<div class="aqi-bar">'
-              + '<div class="v" style="color:' + col + ';">' + Math.round(aqi) + '</div>'
-              + '<div class="b" style="height:' + hPx + 'px; background:' + col + ';"></div>'
-              + '<div class="h">' + pad(hLab) + 'h</div></div>';
-    }
-    $('aqiBars').innerHTML = aqiHtml;
+    renderAqiForecast();
   });
 }
 
-function renderAqiForecast() { /* déprécié, fait dans loadWeather */ }
+function renderAqiForecast() {
+  var data = window.__aqiForecastData;
+  if (!data || !data.hourly) return;
+
+  var nowH = serverTimes ? parseInt(serverTimes.hanoi_hh, 10) : new Date().getHours();
+  var today = serverTimes ? serverTimes.hanoi_iso_date : todayISODate();
+  var startIdx = findHourIndex(data.hourly.time, nowH, today);
+  var aqis = data.hourly.us_aqi;
+
+  var slice = [];
+  var maxAqi = 0;
+  for (var j = 0; j < 24; j += 2) {
+    var idx = startIdx + j;
+    if (idx >= aqis.length) break;
+    slice.push({ aqi: aqis[idx], h: (nowH + j) % 24 });
+    if (aqis[idx] > maxAqi) maxAqi = aqis[idx];
+  }
+  var scaleMax = Math.max(150, maxAqi);
+  var html = '';
+  for (var k = 0; k < slice.length; k++) {
+    var hPx = Math.max(2, (slice[k].aqi / scaleMax) * 40);
+    var col = aqiToColor(slice[k].aqi);
+    html += '<div class="aqi-bar">'
+          + '<div class="v" style="color:' + col + ';">' + Math.round(slice[k].aqi) + '</div>'
+          + '<div class="b" style="height:' + hPx + 'px; background:' + col + ';"></div>'
+          + '<div class="h">' + pad(slice[k].h) + 'h</div></div>';
+  }
+  $('aqiBars').innerHTML = html;
+}
 
 function loadAirIQAir() {
   var url = WORKER_URL + '/iqair?t=' + Math.floor(Date.now() / 60000);
