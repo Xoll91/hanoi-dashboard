@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Dashboard">
+<meta name="apple-mobile-web-app-title" content="Hanoi">
 <title>Hanoi Dashboard</title>
 <link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%231a1a2e'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%23fff'>H</text></svg>">
 <style>
@@ -162,7 +162,6 @@
   .hourly-grid {
     display: -webkit-flex; display: flex;
     -webkit-justify-content: space-between; justify-content: space-between;
-    overflow-x: auto;
   }
   .hour-cell {
     -webkit-flex: 1; flex: 1;
@@ -174,6 +173,7 @@
   .hour-cell .h-icon { font-size: 18px; margin: 4px 0 2px; }
   .hour-cell .h-temp { font-size: 13px; font-weight: 600; }
   .hour-cell .h-rain { font-size: 9px; color: #5e9eff; opacity: 0.8; min-height: 12px; }
+
   .forecast-5d-grid {
     display: -webkit-flex; display: flex;
     -webkit-justify-content: space-between; justify-content: space-between;
@@ -265,7 +265,6 @@
     -webkit-align-items: center; align-items: center;
     -webkit-justify-content: flex-end; justify-content: flex-end;
     height: 100%;
-    position: relative;
   }
   .pm-bar .v { font-size: 10px; font-weight: 600; margin-bottom: 3px; }
   .pm-bar .b {
@@ -273,9 +272,6 @@
     background: -webkit-linear-gradient(top, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
     background: linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
     border-top: 3px solid; min-height: 4px;
-  }
-  .pm-bar .b-range {
-    width: 100%; min-height: 1px; opacity: 0.35;
   }
   .pm-bar .d-name { font-size: 10px; opacity: 0.6; margin-top: 4px; }
 
@@ -298,7 +294,7 @@
 
   .err { color: #ff7070; font-size: 13px; opacity: 0.7; }
 
-  /* ============= iPad / Tablette : tout en plus gros ============= */
+  /* iPad / tablette : tout en plus gros */
   @media (max-width: 1200px) {
     .wrap { padding: 14px; }
     .col-left { padding-right: 14px; }
@@ -341,7 +337,6 @@
     .day .d-min { font-size: 13px; }
     .day .d-rain { font-size: 11px; }
 
-    .hourly-grid { gap: 2px; }
     .hour-cell { padding: 6px 2px; }
     .hour-cell .h-time { font-size: 12px; }
     .hour-cell .h-icon { font-size: 22px; }
@@ -514,21 +509,7 @@
   <span id="lastUpdate">Mise à jour : --</span> · Air : IQAir + WAQI · Météo : Open-Meteo
 </div>
 
-<div id="debugBox" style="position:fixed;bottom:0;left:0;right:0;background:rgba(255,0,0,0.85);color:#fff;font-family:monospace;font-size:11px;padding:6px 10px;max-height:30%;overflow:auto;z-index:9999;display:none;"></div>
-
 <script>
-/* ===== DEBUG : afficher erreurs JS et fetch sur l'iPad ===== */
-function showDebug(msg) {
-  var box = document.getElementById('debugBox');
-  if (!box) return;
-  box.style.display = 'block';
-  box.innerHTML += msg + '<br>';
-}
-window.onerror = function(message, source, lineno, colno, error) {
-  showDebug('JS ERROR: ' + message + ' (line ' + lineno + ')');
-  return false;
-};
-
 var LAT = 21.0285;
 var LON = 105.8542;
 var WORKER_URL = 'https://hanoi-air.christo-fernandes91.workers.dev';
@@ -543,20 +524,16 @@ function ajax(url, cb) {
     if (xhr.readyState === 4) {
       if (xhr.status >= 200 && xhr.status < 300) {
         try { cb(null, JSON.parse(xhr.responseText)); }
-        catch (e) { showDebug('PARSE ERROR ' + url.substr(0, 60) + ': ' + e.message); cb(e); }
-      } else {
-        showDebug('HTTP ' + xhr.status + ' on ' + url.substr(0, 60));
-        cb(new Error('HTTP ' + xhr.status));
-      }
+        catch (e) { cb(e); }
+      } else { cb(new Error('HTTP ' + xhr.status)); }
     }
   };
-  xhr.onerror = function() { showDebug('NETWORK ERROR on ' + url.substr(0, 60)); cb(new Error('Network error')); };
+  xhr.onerror = function() { cb(new Error('Network error')); };
   xhr.send();
 }
 
-/* Heure : on attend que loadWeather() la pousse via setTimes(), puis updateClock incrémente */
-var serverTimes = null;       /* dernières heures reçues du serveur */
-var serverTimestamp = 0;      /* timestamp local au moment de la réception */
+var serverTimes = null;
+var serverTimestamp = 0;
 
 function setTimes(t) {
   serverTimes = t;
@@ -566,7 +543,6 @@ function setTimes(t) {
 
 function renderClock() {
   if (!serverTimes) return;
-  /* On calcule combien de minutes se sont écoulées depuis la dernière sync serveur */
   var elapsedMs = Date.now() - serverTimestamp;
   var hanoiTotal = parseInt(serverTimes.hanoi_hh, 10) * 60 + parseInt(serverTimes.hanoi_mm, 10) + Math.floor(elapsedMs / 60000);
   var hanoiHH = Math.floor(hanoiTotal / 60) % 24;
@@ -622,6 +598,15 @@ function aqiToColor(aqi) {
   if (aqi <= 150) return '#ff9933';
   if (aqi <= 200) return '#ff4444';
   if (aqi <= 300) return '#a040d0';
+  return '#7d0000';
+}
+
+function pm25ToColor(pm) {
+  if (pm <= 12) return '#7CFC50';
+  if (pm <= 35) return '#f5d442';
+  if (pm <= 55) return '#ff9933';
+  if (pm <= 150) return '#ff4444';
+  if (pm <= 250) return '#a040d0';
   return '#7d0000';
 }
 
@@ -704,7 +689,6 @@ function loadWeather() {
       $('days5').innerHTML = dHtml;
     }
 
-    /* Frise horaire */
     var hTemps = data.hourly.temperature_2m;
     var hCodes = data.hourly.weather_code;
     var hRain = data.hourly.precipitation_probability;
@@ -789,10 +773,8 @@ function loadAirIQAir() {
   $('lastUpdate').innerHTML = 'Mise à jour : ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
-/* ---------- Fetch qualité air WAQI (via Cloudflare Worker) ---------- */
 function loadAirWAQI() {
   var url = WORKER_URL + '/waqi?t=' + Math.floor(Date.now() / 60000);
-
   ajax(url, function(err, data) {
     if (err || data.status !== 'ok') {
       $('aqiCat2').innerHTML = 'ERREUR';
@@ -805,7 +787,6 @@ function loadAirWAQI() {
     $('aqiCat2').innerHTML = meta.cat;
     $('aqiCat2').style.color = meta.color;
 
-    /* Recommandation : on prend la valeur la plus élevée des deux par précaution */
     var iqairAqi = parseInt($('aqiVal').innerHTML, 10);
     var maxAqi = isNaN(iqairAqi) ? aqi : Math.max(iqairAqi, aqi);
     var maxMeta = aqiCategory(maxAqi);
@@ -817,7 +798,6 @@ function loadAirWAQI() {
     arc.setAttribute('stroke-dashoffset', dash);
     arc.setAttribute('stroke', meta.color);
 
-    /* Prévisions PM2.5 7 jours depuis WAQI */
     if (data.data.forecast && data.data.forecast.daily && data.data.forecast.daily.pm25) {
       var pm = data.data.forecast.daily.pm25;
       var maxPm = 0;
@@ -843,46 +823,6 @@ function loadAirWAQI() {
   });
 }
 
-/* PM2.5 µg/m³ → couleur (seuils OMS / EPA) */
-function pm25ToColor(pm) {
-  if (pm <= 12) return '#7CFC50';
-  if (pm <= 35) return '#f5d442';
-  if (pm <= 55) return '#ff9933';
-  if (pm <= 150) return '#ff4444';
-  if (pm <= 250) return '#a040d0';
-  return '#7d0000';
-}
-
-function renderAqiForecast() {
-  var data = window.__aqiForecastData;
-  if (!data || !data.hourly) return;
-
-  var nowH = serverTimes ? parseInt(serverTimes.hanoi_hh, 10) : new Date().getHours();
-  var today = serverTimes ? serverTimes.hanoi_iso_date : todayISODate();
-  var startIdx = findHourIndex(data.hourly.time, nowH, today);
-  var aqis = data.hourly.us_aqi;
-
-  var slice = [];
-  var maxAqi = 0;
-  for (var j = 0; j < 24; j += 2) {
-    var idx = startIdx + j;
-    if (idx >= aqis.length) break;
-    slice.push({ aqi: aqis[idx], h: (nowH + j) % 24 });
-    if (aqis[idx] > maxAqi) maxAqi = aqis[idx];
-  }
-  var scaleMax = Math.max(150, maxAqi);
-  var html = '';
-  for (var k = 0; k < slice.length; k++) {
-    var hPx = Math.max(2, (slice[k].aqi / scaleMax) * 40);
-    var col = aqiToColor(slice[k].aqi);
-    html += '<div class="aqi-bar">'
-          + '<div class="v" style="color:' + col + ';">' + Math.round(slice[k].aqi) + '</div>'
-          + '<div class="b" style="height:' + hPx + 'px; background:' + col + ';"></div>'
-          + '<div class="h">' + pad(slice[k].h) + 'h</div></div>';
-  }
-  $('aqiBars').innerHTML = html;
-}
-
 function aqiToPM25(aqi) {
   var bp = [[0,50,0,12],[51,100,12.1,35.4],[101,150,35.5,55.4],[151,200,55.5,150.4],[201,300,150.5,250.4],[301,500,250.5,500]];
   for (var i = 0; i < bp.length; i++) {
@@ -896,7 +836,6 @@ function aqiToPM25(aqi) {
 
 function refreshAll() { loadWeather(); loadAirIQAir(); loadAirWAQI(); }
 
-updateClock();
 setInterval(updateClock, 30 * 1000);
 refreshAll();
 setInterval(refreshAll, 10 * 60 * 1000);
