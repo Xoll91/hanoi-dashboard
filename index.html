@@ -56,8 +56,8 @@
   }
 
   .clock { font-size: 78px; font-weight: 200; letter-spacing: -3px; line-height: 1; }
-  .date { font-size: 18px; opacity: 0.85; margin-top: 8px; }
-  .subtitle { font-size: 14px; opacity: 0.55; margin-top: 4px; }
+  .date { font-size: 22px; opacity: 0.95; margin-top: 10px; font-weight: 400; }
+  .subtitle { font-size: 12px; opacity: 0.45; margin-top: 4px; }
 
   .paris-time {
     display: -webkit-flex; display: flex;
@@ -162,17 +162,21 @@
   .hourly-grid {
     display: -webkit-flex; display: flex;
     -webkit-justify-content: space-between; justify-content: space-between;
+    gap: 4px;
   }
   .hour-cell {
     -webkit-flex: 1; flex: 1;
     text-align: center;
-    padding: 4px 2px;
+    padding: 8px 2px;
     min-width: 0;
+    background: rgba(255,255,255,0.03);
+    border-radius: 8px;
   }
-  .hour-cell .h-time { font-size: 10px; opacity: 0.55; }
-  .hour-cell .h-icon { font-size: 18px; margin: 4px 0 2px; }
-  .hour-cell .h-temp { font-size: 13px; font-weight: 600; }
-  .hour-cell .h-rain { font-size: 9px; color: #5e9eff; opacity: 0.8; min-height: 12px; }
+  .hour-cell.is-night { opacity: 0.55; }
+  .hour-cell .h-time { font-size: 10px; opacity: 0.65; font-weight: 500; }
+  .hour-cell .h-icon { font-size: 22px; margin: 6px 0 4px; }
+  .hour-cell .h-temp { font-size: 14px; font-weight: 600; }
+  .hour-cell .h-rain { font-size: 10px; color: #5e9eff; opacity: 0.85; min-height: 14px; }
 
   .forecast-5d-grid {
     display: -webkit-flex; display: flex;
@@ -303,8 +307,8 @@
     .card { padding: 18px; border-radius: 18px; }
 
     .clock { font-size: 92px; }
-    .date { font-size: 22px; }
-    .subtitle { font-size: 16px; }
+    .date { font-size: 26px; }
+    .subtitle { font-size: 13px; }
 
     .paris-time { padding: 10px 14px; margin-top: 14px; }
     .paris-time .paris-lbl { font-size: 14px; }
@@ -343,9 +347,9 @@
     .hour-cell .h-temp { font-size: 16px; }
     .hour-cell .h-rain { font-size: 11px; }
 
-    .gauge-mini { width: 150px; height: 150px; }
-    .gauge-src { font-size: 13px; }
-    .gauge-center .iqa-val { font-size: 42px; }
+    .gauge-mini { width: 165px; height: 165px; }
+    .gauge-src { font-size: 13px; margin-bottom: 8px; }
+    .gauge-center .iqa-val { font-size: 48px; }
     .gauge-center .iqa-cat { font-size: 11px; }
 
     .pollu .name { font-size: 12px; }
@@ -439,7 +443,7 @@
   <div class="col-right">
     <div class="card">
       <div class="card-title">QUALITÉ DE L'AIR</div>
-      <div class="card-sub">Hanoi · IQAir AirVisual</div>
+      <div class="card-sub">Hanoi · IQAir + WAQI</div>
 
       <div class="dual-gauge">
         <div class="gauge-block">
@@ -485,7 +489,7 @@
         </div>
         <div class="pollu">
           <div class="name">VENT</div>
-          <div class="val"><span id="airWind">--</span> <span class="unit">m/s</span></div>
+          <div class="val"><span id="airWind">--</span> <span class="unit">km/h</span></div>
         </div>
       </div>
 
@@ -657,29 +661,51 @@ function loadWeather() {
 
     var startIdx = findHourIndex(data.hourly.time, nowH, today);
     var uvs = data.hourly.uv_index;
+    var hIsDayArr = data.hourly.is_day;
+
+    /* Si on est de nuit, on saute jusqu'à la prochaine plage de jour pour afficher du contenu utile */
+    var uvStartIdx = startIdx;
+    var nightSkipped = false;
+    if (c.is_day !== 1) {
+      for (var s = startIdx; s < hIsDayArr.length; s++) {
+        if (hIsDayArr[s] === 1) { uvStartIdx = s; nightSkipped = (s !== startIdx); break; }
+      }
+    }
+
     var uvHtml = '';
-    for (var j = 0; j < 12; j++) {
-      var idx = startIdx + j;
-      if (idx >= uvs.length) break;
-      var uv = uvs[idx];
+    var uvCount = 0;
+    var i = uvStartIdx;
+    while (uvCount < 12 && i < uvs.length) {
+      /* Quand on est en mode "demain", on s'arrête au coucher de soleil */
+      if (nightSkipped && hIsDayArr[i] !== 1 && uvCount > 0) break;
+      var uv = uvs[i];
       var meta = uvCategory(uv);
-      var hourLabel = (nowH + j) % 24;
+      var hLabel = parseInt(data.hourly.time[i].substr(11, 2), 10);
       uvHtml += '<div class="uv-cell" style="background:' + meta.bg + '; color:' + meta.color + ';">'
               + Math.round(uv)
-              + '<div class="uv-h">' + pad(hourLabel) + 'h</div></div>';
+              + '<div class="uv-h">' + pad(hLabel) + 'h</div></div>';
+      i++; uvCount++;
     }
     $('uvGrid').innerHTML = uvHtml;
+    /* Mise à jour du libellé selon contexte */
+    var uvLabel = nightSkipped ? 'UV demain dans la journée' : 'Indice UV — prochaines heures';
+    var uvTitle = document.querySelector('.uv-hourly-title .ttl');
+    if (uvTitle) uvTitle.innerHTML = uvLabel;
 
     if (data.daily) {
       var days = data.daily;
       var jours = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
       var dHtml = '';
-      for (var k = 1; k <= 5; k++) {
+      /* Si on est avant 18h, on inclut aujourd'hui (sinon la journée est presque finie) */
+      var dayStart = (nowH < 18) ? 0 : 1;
+      var dayEnd = dayStart + 5;
+      for (var k = dayStart; k < dayEnd; k++) {
         if (!days.time[k]) break;
         var dt = new Date(days.time[k] + 'T12:00:00');
         var dInfo = weatherDesc(days.weather_code[k], true);
+        var dName = (k === 0) ? 'Auj.' : jours[dt.getDay()];
         dHtml += '<div class="day">'
-               + '<div class="d-name">' + jours[dt.getDay()] + '</div>'
+               + '<div class="d-name">' + dName + '</div>'
                + '<div class="d-icon">' + dInfo.icon + '</div>'
                + '<div class="d-max">' + Math.round(days.temperature_2m_max[k]) + '°</div>'
                + '<div class="d-min">' + Math.round(days.temperature_2m_min[k]) + '°</div>'
@@ -698,9 +724,11 @@ function loadWeather() {
       var hi = startIdx + m;
       if (hi >= hTemps.length) break;
       var hLabel = (nowH + m) % 24;
-      var hInfo = weatherDesc(hCodes[hi], hIsDay[hi] === 1);
+      var isDay = hIsDay[hi] === 1;
+      var hInfo = weatherDesc(hCodes[hi], isDay);
       var rainTxt = hRain[hi] && hRain[hi] >= 10 ? '💧' + Math.round(hRain[hi]) + '%' : '';
-      hHtml += '<div class="hour-cell">'
+      var nightCls = isDay ? '' : ' is-night';
+      hHtml += '<div class="hour-cell' + nightCls + '">'
              + '<div class="h-time">' + (m === 0 ? 'Maint.' : pad(hLabel) + 'h') + '</div>'
              + '<div class="h-icon">' + hInfo.icon + '</div>'
              + '<div class="h-temp">' + Math.round(hTemps[hi]) + '°</div>'
@@ -759,9 +787,11 @@ function loadAirIQAir() {
     $('aqiCat').innerHTML = meta.cat;
     $('aqiCat').style.color = meta.color;
 
-    if (p.mainus === 'p2') $('pm25').innerHTML = aqiToPM25(aqi);
+    /* PM2.5 toujours estimé depuis AQI (même si polluant principal différent) */
+    $('pm25').innerHTML = aqiToPM25(aqi);
     $('airHum').innerHTML = w.hu;
-    $('airWind').innerHTML = w.ws;
+    /* Vent en m/s, on le convertit en km/h pour cohérence avec la météo */
+    $('airWind').innerHTML = w.ws ? Math.round(w.ws * 3.6) : '0';
 
     var pct = Math.min(1, aqi / 300);
     var dash = 534 * (1 - pct);
@@ -769,8 +799,6 @@ function loadAirIQAir() {
     arc.setAttribute('stroke-dashoffset', dash);
     arc.setAttribute('stroke', meta.color);
   });
-  var d = new Date();
-  $('lastUpdate').innerHTML = 'Mise à jour : ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
 function loadAirWAQI() {
@@ -779,6 +807,10 @@ function loadAirWAQI() {
     if (err || data.status !== 'ok') {
       $('aqiCat2').innerHTML = 'ERREUR';
       return;
+    }
+    /* Heure de mise à jour (Hanoi) */
+    if (serverTimes) {
+      $('lastUpdate').innerHTML = 'Mise à jour : ' + serverTimes.hanoi_hh + ':' + serverTimes.hanoi_mm + ' (Hanoi)';
     }
     var aqi = data.data.aqi;
     var meta = aqiCategory(aqi);
@@ -789,8 +821,14 @@ function loadAirWAQI() {
 
     var iqairAqi = parseInt($('aqiVal').innerHTML, 10);
     var maxAqi = isNaN(iqairAqi) ? aqi : Math.max(iqairAqi, aqi);
+    var minAqi = isNaN(iqairAqi) ? aqi : Math.min(iqairAqi, aqi);
     var maxMeta = aqiCategory(maxAqi);
-    $('recoTxt').innerHTML = maxMeta.reco;
+    var recoText = maxMeta.reco;
+    /* Si écart important entre IQAir et WAQI, on le mentionne */
+    if (!isNaN(iqairAqi) && (maxAqi - minAqi) > 30) {
+      recoText = 'Selon la station, AQI entre ' + minAqi + ' et ' + maxAqi + '. ' + recoText;
+    }
+    $('recoTxt').innerHTML = recoText;
 
     var pct = Math.min(1, aqi / 300);
     var dash = 534 * (1 - pct);
