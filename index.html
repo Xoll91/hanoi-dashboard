@@ -153,6 +153,27 @@
     border-top: 1px solid rgba(255,255,255,0.08);
   }
   .forecast-5d-title { font-size: 11px; opacity: 0.55; letter-spacing: 1.2px; margin-bottom: 10px; text-transform: uppercase; }
+
+  .hourly-forecast {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.08);
+  }
+  .hourly-grid {
+    display: -webkit-flex; display: flex;
+    -webkit-justify-content: space-between; justify-content: space-between;
+    overflow-x: auto;
+  }
+  .hour-cell {
+    -webkit-flex: 1; flex: 1;
+    text-align: center;
+    padding: 4px 2px;
+    min-width: 0;
+  }
+  .hour-cell .h-time { font-size: 10px; opacity: 0.55; }
+  .hour-cell .h-icon { font-size: 18px; margin: 4px 0 2px; }
+  .hour-cell .h-temp { font-size: 13px; font-weight: 600; }
+  .hour-cell .h-rain { font-size: 9px; color: #5e9eff; opacity: 0.8; min-height: 12px; }
   .forecast-5d-grid {
     display: -webkit-flex; display: flex;
     -webkit-justify-content: space-between; justify-content: space-between;
@@ -215,7 +236,7 @@
     display: -webkit-flex; display: flex;
     -webkit-justify-content: space-between; justify-content: space-between;
     -webkit-align-items: flex-end; align-items: flex-end;
-    height: 50px;
+    height: 75px;
   }
   .aqi-bar {
     -webkit-flex: 1; flex: 1;
@@ -226,8 +247,37 @@
     -webkit-justify-content: flex-end; justify-content: flex-end;
     height: 100%;
   }
+  .aqi-bar .v { font-size: 10px; font-weight: 600; margin-bottom: 2px; }
   .aqi-bar .b { width: 100%; border-radius: 2px 2px 0 0; min-height: 2px; }
   .aqi-bar .h { font-size: 9px; opacity: 0.45; margin-top: 3px; }
+
+  .pm-bars {
+    display: -webkit-flex; display: flex;
+    -webkit-justify-content: space-between; justify-content: space-between;
+    -webkit-align-items: flex-end; align-items: flex-end;
+    height: 90px;
+  }
+  .pm-bar {
+    -webkit-flex: 1; flex: 1;
+    margin: 0 2px;
+    display: -webkit-flex; display: flex;
+    -webkit-flex-direction: column; flex-direction: column;
+    -webkit-align-items: center; align-items: center;
+    -webkit-justify-content: flex-end; justify-content: flex-end;
+    height: 100%;
+    position: relative;
+  }
+  .pm-bar .v { font-size: 10px; font-weight: 600; margin-bottom: 3px; }
+  .pm-bar .b {
+    width: 100%; border-radius: 3px 3px 0 0;
+    background: -webkit-linear-gradient(top, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
+    background: linear-gradient(to bottom, rgba(255,255,255,0.15), rgba(255,255,255,0.05));
+    border-top: 3px solid; min-height: 4px;
+  }
+  .pm-bar .b-range {
+    width: 100%; min-height: 1px; opacity: 0.35;
+  }
+  .pm-bar .d-name { font-size: 10px; opacity: 0.6; margin-top: 4px; }
 
   .reco-box {
     margin-top: 12px;
@@ -306,6 +356,11 @@
         </div>
       </div>
 
+      <div class="hourly-forecast">
+        <div class="forecast-5d-title">Heure par heure</div>
+        <div class="hourly-grid" id="hourlyGrid"></div>
+      </div>
+
       <div class="forecast-5d">
         <div class="forecast-5d-title">Prochains 5 jours</div>
         <div class="forecast-5d-grid" id="days5"></div>
@@ -369,6 +424,11 @@
       <div class="aqi-forecast">
         <div class="aqi-forecast-title">Prévisions AQI — 24h</div>
         <div class="aqi-bars" id="aqiBars"></div>
+      </div>
+
+      <div class="aqi-forecast">
+        <div class="aqi-forecast-title">PM2.5 — 7 prochains jours</div>
+        <div class="pm-bars" id="pmBars"></div>
       </div>
 
       <div class="reco-box" id="recoTxt">Chargement...</div>
@@ -487,7 +547,7 @@ function loadWeather() {
   var url = 'https://api.open-meteo.com/v1/forecast'
     + '?latitude=' + LAT + '&longitude=' + LON
     + '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,is_day,uv_index,wind_speed_10m,surface_pressure,precipitation_probability'
-    + '&hourly=uv_index'
+    + '&hourly=uv_index,temperature_2m,weather_code,precipitation_probability,is_day'
     + '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max,sunrise,sunset'
     + '&timezone=Asia%2FBangkok'
     + '&forecast_days=6';
@@ -549,6 +609,28 @@ function loadWeather() {
       }
       $('days5').innerHTML = dHtml;
     }
+
+    /* Frise horaire : 12 prochaines heures avec icône + temp + pluie */
+    var hTemps = data.hourly.temperature_2m;
+    var hCodes = data.hourly.weather_code;
+    var hRain = data.hourly.precipitation_probability;
+    var hIsDay = data.hourly.is_day;
+    var hHtml = '';
+    var nbHours = 12;
+    for (var m = 0; m < nbHours; m++) {
+      var hi = startIdx + m;
+      if (hi >= hTemps.length) break;
+      var hLabel = (nowH + m) % 24;
+      var hInfo = weatherDesc(hCodes[hi], hIsDay[hi] === 1);
+      var rainTxt = hRain[hi] && hRain[hi] >= 10 ? '💧' + Math.round(hRain[hi]) + '%' : '';
+      hHtml += '<div class="hour-cell">'
+             + '<div class="h-time">' + (m === 0 ? 'Maint.' : pad(hLabel) + 'h') + '</div>'
+             + '<div class="h-icon">' + hInfo.icon + '</div>'
+             + '<div class="h-temp">' + Math.round(hTemps[hi]) + '°</div>'
+             + '<div class="h-rain">' + rainTxt + '</div>'
+             + '</div>';
+    }
+    $('hourlyGrid').innerHTML = hHtml;
   });
 }
 
@@ -609,7 +691,41 @@ function loadAirWAQI() {
     var arc = $('gaugeArc2');
     arc.setAttribute('stroke-dashoffset', dash);
     arc.setAttribute('stroke', meta.color);
+
+    /* Prévisions PM2.5 7 jours depuis WAQI */
+    if (data.data.forecast && data.data.forecast.daily && data.data.forecast.daily.pm25) {
+      var pm = data.data.forecast.daily.pm25;
+      var maxPm = 0;
+      for (var p = 0; p < pm.length; p++) {
+        if (pm[p].max > maxPm) maxPm = pm[p].max;
+      }
+      var scaleMaxPm = Math.max(50, maxPm);
+      var jourCourts = ['Dim','Lun','Mar','Mer','Jeu','Ven','Sam'];
+      var pmHtml = '';
+      for (var q = 0; q < pm.length && q < 7; q++) {
+        var dt = new Date(pm[q].day + 'T12:00:00');
+        var avg = pm[q].avg;
+        var col = pm25ToColor(avg);
+        var hPx = Math.max(4, (avg / scaleMaxPm) * 60);
+        pmHtml += '<div class="pm-bar">'
+                + '<div class="v" style="color:' + col + ';">' + avg + '</div>'
+                + '<div class="b" style="height:' + hPx + 'px; border-color:' + col + ';"></div>'
+                + '<div class="d-name">' + jourCourts[dt.getDay()] + '</div>'
+                + '</div>';
+      }
+      $('pmBars').innerHTML = pmHtml;
+    }
   });
+}
+
+/* PM2.5 µg/m³ → couleur (seuils OMS / EPA) */
+function pm25ToColor(pm) {
+  if (pm <= 12) return '#7CFC50';
+  if (pm <= 35) return '#f5d442';
+  if (pm <= 55) return '#ff9933';
+  if (pm <= 150) return '#ff4444';
+  if (pm <= 250) return '#a040d0';
+  return '#7d0000';
 }
 
 function loadAirForecast() {
@@ -640,6 +756,7 @@ function loadAirForecast() {
       var hPx = Math.max(2, (slice[k].aqi / scaleMax) * 40);
       var col = aqiToColor(slice[k].aqi);
       html += '<div class="aqi-bar">'
+            + '<div class="v" style="color:' + col + ';">' + Math.round(slice[k].aqi) + '</div>'
             + '<div class="b" style="height:' + hPx + 'px; background:' + col + ';"></div>'
             + '<div class="h">' + pad(slice[k].h) + 'h</div></div>';
     }
