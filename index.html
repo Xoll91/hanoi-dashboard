@@ -514,7 +514,21 @@
   <span id="lastUpdate">Mise à jour : --</span> · Air : IQAir + WAQI · Météo : Open-Meteo
 </div>
 
+<div id="debugBox" style="position:fixed;bottom:0;left:0;right:0;background:rgba(255,0,0,0.85);color:#fff;font-family:monospace;font-size:11px;padding:6px 10px;max-height:30%;overflow:auto;z-index:9999;display:none;"></div>
+
 <script>
+/* ===== DEBUG : afficher erreurs JS et fetch sur l'iPad ===== */
+function showDebug(msg) {
+  var box = document.getElementById('debugBox');
+  if (!box) return;
+  box.style.display = 'block';
+  box.innerHTML += msg + '<br>';
+}
+window.onerror = function(message, source, lineno, colno, error) {
+  showDebug('JS ERROR: ' + message + ' (line ' + lineno + ')');
+  return false;
+};
+
 var LAT = 21.0285;
 var LON = 105.8542;
 var WORKER_URL = 'https://hanoi-air.christo-fernandes91.workers.dev';
@@ -529,11 +543,14 @@ function ajax(url, cb) {
     if (xhr.readyState === 4) {
       if (xhr.status >= 200 && xhr.status < 300) {
         try { cb(null, JSON.parse(xhr.responseText)); }
-        catch (e) { cb(e); }
-      } else { cb(new Error('HTTP ' + xhr.status)); }
+        catch (e) { showDebug('PARSE ERROR ' + url.substr(0, 60) + ': ' + e.message); cb(e); }
+      } else {
+        showDebug('HTTP ' + xhr.status + ' on ' + url.substr(0, 60));
+        cb(new Error('HTTP ' + xhr.status));
+      }
     }
   };
-  xhr.onerror = function() { cb(new Error('Network error')); };
+  xhr.onerror = function() { showDebug('NETWORK ERROR on ' + url.substr(0, 60)); cb(new Error('Network error')); };
   xhr.send();
 }
 
