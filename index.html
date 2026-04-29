@@ -384,9 +384,7 @@
 <script>
 var LAT = 21.0285;
 var LON = 105.8542;
-var IQAIR_PROXY_URL = 'https://hanoi-air.christo-fernandes91.workers.dev';
-/* Token WAQI gratuit : récupère-le sur https://aqicn.org/data-platform/token/ */
-var WAQI_TOKEN = 'METS_TON_TOKEN_WAQI_ICI';
+var WORKER_URL = 'https://hanoi-air.christo-fernandes91.workers.dev';
 
 function $(id) { return document.getElementById(id); }
 function pad(n) { return n < 10 ? '0' + n : '' + n; }
@@ -555,7 +553,7 @@ function loadWeather() {
 }
 
 function loadAirIQAir() {
-  var url = IQAIR_PROXY_URL + '?t=' + Math.floor(Date.now() / 60000);
+  var url = WORKER_URL + '/iqair?t=' + Math.floor(Date.now() / 60000);
   ajax(url, function(err, data) {
     if (err || data.status !== 'success') {
       $('aqiCat').innerHTML = 'ERREUR';
@@ -584,10 +582,9 @@ function loadAirIQAir() {
   $('lastUpdate').innerHTML = 'Mise à jour : ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
 }
 
-/* ---------- Fetch qualité air WAQI (aqicn.org) ---------- */
+/* ---------- Fetch qualité air WAQI (via Cloudflare Worker) ---------- */
 function loadAirWAQI() {
-  /* Station UN International School of Hanoi (@H8688) - la même que sur ta capture aqicn.org */
-  var url = 'https://api.waqi.info/feed/@H8688/?token=' + WAQI_TOKEN;
+  var url = WORKER_URL + '/waqi?t=' + Math.floor(Date.now() / 60000);
 
   ajax(url, function(err, data) {
     if (err || data.status !== 'ok') {
@@ -601,7 +598,7 @@ function loadAirWAQI() {
     $('aqiCat2').innerHTML = meta.cat;
     $('aqiCat2').style.color = meta.color;
 
-    /* Recommandation : on prend la valeur la plus élevée des deux pour rester prudent */
+    /* Recommandation : on prend la valeur la plus élevée des deux par précaution */
     var iqairAqi = parseInt($('aqiVal').innerHTML, 10);
     var maxAqi = isNaN(iqairAqi) ? aqi : Math.max(iqairAqi, aqi);
     var maxMeta = aqiCategory(maxAqi);
