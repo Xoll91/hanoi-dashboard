@@ -297,6 +297,79 @@
   }
 
   .err { color: #ff7070; font-size: 13px; opacity: 0.7; }
+
+  /* ============= iPad / Tablette : tout en plus gros ============= */
+  @media (max-width: 1200px) {
+    .wrap { padding: 14px; }
+    .col-left { padding-right: 14px; }
+    .col-mid { padding: 0 7px; }
+    .col-right { padding-left: 7px; }
+    .card { padding: 18px; border-radius: 18px; }
+
+    .clock { font-size: 92px; }
+    .date { font-size: 22px; }
+    .subtitle { font-size: 16px; }
+
+    .paris-time { padding: 10px 14px; margin-top: 14px; }
+    .paris-time .paris-lbl { font-size: 14px; }
+    .paris-time .paris-val { font-size: 26px; }
+
+    .sun-info { font-size: 15px; margin-top: 22px; }
+    .sun-info .lbl { font-size: 13px; }
+    .sun-info .val { font-size: 22px; }
+
+    .uv-section { margin-top: 22px; padding-top: 18px; }
+    .uv-hourly-title .ttl { font-size: 14px; }
+    .uv-hourly-title .now-val { font-size: 16px; }
+    .uv-hourly-title .now-val strong { font-size: 24px; }
+    .uv-cell { font-size: 14px; padding: 10px 0 8px; }
+    .uv-cell .uv-h { font-size: 11px; }
+
+    .card-title { font-size: 28px; }
+    .card-title .icon { font-size: 30px; }
+    .card-sub { font-size: 13px; margin-bottom: 16px; }
+
+    .label { font-size: 13px; margin-top: 14px; }
+    .big-num { font-size: 70px; }
+    .small-num { font-size: 28px; }
+    .meteo-top .right { font-size: 15px; }
+
+    .forecast-5d-title { font-size: 13px; margin-bottom: 12px; }
+    .day .d-name { font-size: 13px; }
+    .day .d-icon { font-size: 26px; }
+    .day .d-max { font-size: 17px; }
+    .day .d-min { font-size: 13px; }
+    .day .d-rain { font-size: 11px; }
+
+    .hourly-grid { gap: 2px; }
+    .hour-cell { padding: 6px 2px; }
+    .hour-cell .h-time { font-size: 12px; }
+    .hour-cell .h-icon { font-size: 22px; }
+    .hour-cell .h-temp { font-size: 16px; }
+    .hour-cell .h-rain { font-size: 11px; }
+
+    .gauge-mini { width: 150px; height: 150px; }
+    .gauge-src { font-size: 13px; }
+    .gauge-center .iqa-val { font-size: 42px; }
+    .gauge-center .iqa-cat { font-size: 11px; }
+
+    .pollu .name { font-size: 12px; }
+    .pollu .val { font-size: 19px; }
+    .pollu .unit { font-size: 12px; }
+
+    .aqi-forecast-title { font-size: 13px; margin-bottom: 10px; }
+    .aqi-bars { height: 90px; }
+    .aqi-bar .v { font-size: 12px; }
+    .aqi-bar .h { font-size: 11px; }
+
+    .pm-bars { height: 110px; }
+    .pm-bar .v { font-size: 12px; }
+    .pm-bar .d-name { font-size: 12px; }
+
+    .reco-box { font-size: 14px; padding: 12px 14px; }
+
+    .footer-info { font-size: 12px; }
+  }
 </style>
 </head>
 <body>
@@ -427,7 +500,7 @@
       </div>
 
       <div class="aqi-forecast">
-        <div class="aqi-forecast-title">PM2.5 — 7 prochains jours</div>
+        <div class="aqi-forecast-title">AQI — 7 prochains jours (PM2.5)</div>
         <div class="pm-bars" id="pmBars"></div>
       </div>
 
